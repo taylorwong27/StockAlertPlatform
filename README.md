@@ -87,11 +87,11 @@ tests/test_alerts.py	Automated tests for the alert system
 
 Step 1: Clone the Repository
 
-git clone https://github.com/taylorwong27/my-first-project.git
+git clone https://github.com/taylorwong27/StockAlertPlatform
 
 Navigate into the project folder:
 
-cd my-first-project
+cd Stock Alert Platform
 
 Step 2: Create a Virtual Environment
 
