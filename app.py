@@ -4,8 +4,7 @@ from stock_data import get_price_history
 from stock_news import get_stock_news
 from signals import generate_signal, add_moving_averages
 from backtest import backtest_ma_cross
-from alerts import process_price_alert
-
+from alerts import process_price_alert, send_alert
 
 # Dashboard settings
 st.set_page_config(
@@ -117,7 +116,7 @@ st.subheader("Strategy Backtesting")
 try:
     result = backtest_ma_cross(price_history)
 
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
 
     col1.metric(
         "Number of Signals",
@@ -125,22 +124,39 @@ try:
     )
 
     col2.metric(
+        "Number of Trades",
+        result.get("num_trades", "N/A")
+    )
+
+    col3.metric(
         "Strategy Return",
         f"{result['strategy_return']:.2f}%"
     )
 
-    col3.metric(
+    col4.metric(
         "Buy & Hold Return",
         f"{result['buy_hold_return']:.2f}%"
     )
 
-    st.caption(result["assumptions"])
+    st.caption(
+        "Signals count SMA crossover signals. "
+        "Trades count executed orders."
+    )
+
+    unexecuted_signal = result.get("unexecuted_signal")
+
+    if unexecuted_signal:
+        st.info(
+            f"Unexecuted signal: {unexecuted_signal}"
+        )
+
+    st.caption(str(result.get("assumptions", "")))
 
 except ValueError as error:
     st.info(str(error))
 
-except Exception as error:
-    st.warning(f"Unable to run backtesting: {error}")
+except Exception:
+    st.warning("Unable to run backtesting. Please check the data.")
 
 
 # Price Alert
@@ -168,12 +184,52 @@ channel = st.selectbox(
 )
 
 if st.button("Set Price Alert"):
-
     result = process_price_alert(
-    ticker,
-    current_price,
-    threshold,
-    direction,
-    channel,
-    signal=current_signal
+        ticker,
+        current_price,
+        threshold,
+        direction,
+        channel,
+        signal=current_signal
+    )
+
+    if result["success"]:
+        st.success("Price alert sent successfully!")
+    else:
+        st.warning(result.get("error", "Unable to send alert."))
+
+# Independent TEST notification
+st.divider()
+st.write(
+    "Send a TEST notification to verify your Telegram "
+    "or Discord connection. This does not create a price alert."
 )
+
+if st.button("Send TEST Alert"):
+    test_message = (
+        f"TEST - Stock Alert Platform\n"
+        f"Ticker: {ticker}\n"
+        f"Latest available closing price: ${current_price:.2f}\n"
+        f"Price date: {latest_date}\n"
+        f"Trading signal: {current_signal}\n"
+        f"This is a TEST notification only."
+    )
+
+    try:
+        test_result = send_alert(test_message, channel)
+
+        if test_result.get("success"):
+            st.success(
+                f"TEST notification sent successfully via {channel}!"
+            )
+        else:
+            st.error(
+                "TEST notification failed. "
+                "Please check your notification configuration."
+            )
+
+    except Exception:
+        st.error(
+            "Unable to send TEST notification. "
+            "Please check your notification configuration."
+        )

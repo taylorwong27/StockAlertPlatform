@@ -1,6 +1,7 @@
 import os
 import requests
 import json
+import tempfile
 from datetime import datetime
 from dotenv import load_dotenv
 
@@ -117,21 +118,69 @@ HISTORY_FILE = "alert_history.json"
 
 
 def load_alert_history():
-    """Load previously triggered alerts."""
+    """Load alert history without silently discarding damaged records."""
 
     try:
-        with open(HISTORY_FILE, "r") as file:
-            return json.load(file)
+        with open(HISTORY_FILE, "r", encoding="utf-8") as file:
+            history = json.load(file)
 
     except FileNotFoundError:
         return {"alerts": []}
 
+    except json.JSONDecodeError as error:
+        raise ValueError(
+            "Alert history JSON is corrupted. "
+            "Please repair or restore the file before sending alerts."
+        ) from error
+
+    except OSError as error:
+        raise OSError(
+            "Unable to read alert history. "
+            "Please check file permissions."
+        ) from error
+
+    if not isinstance(history, dict):
+        raise ValueError("Alert history must be a JSON object.")
+
+    if not isinstance(history.get("alerts"), list):
+        raise ValueError("Alert history must contain an alerts list.")
+
+    for alert in history["alerts"]:
+        if not isinstance(alert, dict):
+            raise ValueError("Alert history contains an invalid alert record.")
+
+        if "alert_id" in alert and not isinstance(alert["alert_id"], str):
+            raise ValueError("Alert history contains an invalid alert ID.")
+    return history
 
 def save_alert_history(history):
-    """Save triggered alerts."""
+    """Save alert history using an atomic file replacement."""
 
-    with open(HISTORY_FILE, "w") as file:
-        json.dump(history, file, indent=4)
+    directory = os.path.dirname(
+        os.path.abspath(HISTORY_FILE)
+    )
+
+    temp_path = None
+
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=directory,
+            prefix=".alert_history_",
+            suffix=".tmp",
+            delete=False
+        ) as temp_file:
+            temp_path = temp_file.name
+            json.dump(history, temp_file, indent=4)
+            temp_file.flush()
+            os.fsync(temp_file.fileno())
+
+        os.replace(temp_path, HISTORY_FILE)
+
+    finally:
+        if temp_path and os.path.exists(temp_path):
+            os.unlink(temp_path)
 
 def process_price_alert(
     ticker,
@@ -154,16 +203,14 @@ def process_price_alert(
     history = load_alert_history()
 
     # Create a unique alert ID
-    alert_id = f"{ticker.upper()}_{direction}_{threshold}"
-
+    alert_id = f"{ticker.upper()}_{direction}_{float(threshold):.2f}_{channel.lower()}"
     # Check whether this alert has already been sent
     for alert in history["alerts"]:
-        if alert["alert_id"] == alert_id:
+        if alert.get("alert_id") == alert_id:
             return {
                 "success": False,
                 "error": "Duplicate alert already sent"
             }
-
     # Create notification message
     triggered_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
@@ -198,8 +245,17 @@ def process_price_alert(
             "triggered_at": datetime.now().isoformat()
         })
 
-        save_alert_history(history)
-
+        try:
+            save_alert_history(history)
+        except OSError:
+            return {
+                "success": True,
+                "error": (
+                    "Notification sent, but alert history could not be saved. "
+                    "A duplicate notification may be sent next time."
+                ),
+                "history_saved": False
+            }
     return result
         
 if __name__ == "__main__":

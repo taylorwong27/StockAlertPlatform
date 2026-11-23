@@ -98,5 +98,35 @@ class TestAlertHistory(unittest.TestCase):
             alerts.send_alert = original_send_alert
 
 
+def test_notification_sent_but_history_save_failed():
+    from unittest.mock import patch
+    import alerts
+
+    with patch.object(
+        alerts,
+        "load_alert_history",
+        return_value={"alerts": []}
+    ), patch.object(
+        alerts,
+        "send_alert",
+        return_value={"success": True, "error": None}
+    ), patch.object(
+        alerts,
+        "save_alert_history",
+        side_effect=OSError("Disk full")
+    ):
+        result = alerts.process_price_alert(
+            ticker="AAPL",
+            price=155,
+            threshold=150,
+            direction="above",
+            channel="telegram"
+        )
+
+    assert result["success"] is True
+    assert result["history_saved"] is False
+    assert "could not be saved" in result["error"]
+
+
 if __name__ == "__main__":
     unittest.main()
