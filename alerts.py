@@ -2,7 +2,7 @@ import os
 import requests
 import json
 import tempfile
-from datetime import datetime
+from datetime import datetime, timezone
 from dotenv import load_dotenv
 
 # Load information from .env
@@ -188,7 +188,8 @@ def process_price_alert(
     threshold,
     direction,
     channel,
-    signal="N/A"
+    signal="N/A",
+    latest_date=None
 ):
     """Check price condition and prevent duplicate notifications."""
 
@@ -212,7 +213,8 @@ def process_price_alert(
                 "error": "Duplicate alert already sent"
             }
     # Create notification message
-    triggered_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    triggered_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    price_date = str(latest_date) if latest_date is not None else "Not available"
     
     message = f"""
 
@@ -228,6 +230,8 @@ def process_price_alert(
 
     Trading Signal: {signal}
 
+    Price Date: {price_date}
+
     Triggered At: {triggered_at}
 
     """
@@ -242,7 +246,8 @@ def process_price_alert(
             "ticker": ticker.upper(),
             "condition": direction,
             "threshold": threshold,
-            "triggered_at": datetime.now().isoformat()
+            "triggered_at": datetime.now(timezone.utc).isoformat(),
+            "price_date": price_date
         })
 
         try:

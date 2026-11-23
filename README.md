@@ -46,12 +46,12 @@ Price Alerts
 * Set custom target prices.
 * Support ABOVE and BELOW price conditions.
 * Send notifications through Telegram or Discord.
-* Include stock ticker, current price, target price, trading signal, and trigger time in notifications.
+* Include stock ticker, current price, target price, trading signal, and trigger time and the quoted trading date in notifications.
 
 Duplicate Alert Prevention
 
 * Store triggered alert records in a local JSON file.
-* Prevent repeated notifications for the same ticker, condition, and threshold.
+* Prevent repeated notifications for the same ticker, condition, threshold, and channel (one-time alerts).
 
 3. Project Structure
 
@@ -65,11 +65,14 @@ StockAlertPlatform/
 ├── backtest.py
 ├── requirements.txt
 ├── README.md
-├── .env
+├── .env.example
 ├── .gitignore
+├── partC_test.py
 │
 └── tests/
-    └── test_alerts.py
+    ├── test_alerts.py
+    ├── test_stock_news.py
+    └── test_news_regressions.py
 
 Main Files
 
@@ -91,7 +94,7 @@ git clone https://github.com/taylorwong27/StockAlertPlatform
 
 Navigate into the project folder:
 
-cd Stock Alert Platform
+cd StockAlertPlatform
 
 Step 2: Create a Virtual Environment
 
@@ -109,7 +112,7 @@ python -m pip install -r requirements.txt
 
 The application uses environment variables to store notification credentials.
 
-Create a .env file in the project root directory.
+Copy `.env.example` to `.env` in the project root directory (for example: `cp .env.example .env`).
 
 Add the following configuration:
 
@@ -146,9 +149,14 @@ The notification includes:
 * Target price
 * Alert condition
 * Trading signal
-* Triggered time
+* Triggered time (UTC)
+* Price date (latest available trading date)
 
 The current implementation checks the latest available closing price when the user clicks the alert button. It does not continuously monitor stock prices in the background.
+
+**Alert re-trigger policy:** Alerts are one-time per ticker, direction, target price, and notification channel. After a successful send, the same alert will not automatically re-arm when the price crosses back over the threshold. Telegram and Discord are tracked separately.
+
+**History recovery:** If a notification is delivered but saving `alert_history.json` fails, the dashboard displays a warning. Do not immediately retry: the recipient may already have received the alert. Check Telegram/Discord and restore write access or disk space before sending another alert. If the history file is corrupted, the dashboard blocks sending until the file is repaired or restored; keep a backup before making changes. This is a documented limitation, not an automatic recovery queue.
 
 8. Running Automated Tests
 
@@ -156,7 +164,7 @@ The project includes automated tests for the price alert system.
 
 Run the following command from the project root directory:
 
-python -m unittest discover -s tests -v
+python -m pytest -q
 
 The tests cover:
 
@@ -167,7 +175,9 @@ The tests cover:
 * Alert history saving and loading
 * Duplicate alert prevention
 
-The automated test suite currently contains seven tests.
+The test count may change as the project evolves. Run pytest to see the current number of passing tests.
+
+The `partC_test.py` file in the project root contains additional Student C tests.
 
 9. Disclaimer
 
@@ -176,3 +186,8 @@ This platform is developed for educational purposes only.
 Trading signals and backtesting results are based on historical stock price data and technical indicators. Past performance does not guarantee future results.
 
 This platform does not provide financial advice or guarantee investment returns. Users should conduct their own research before making investment decisions.
+## Submission checklist
+
+- Do not submit `.env`, `alert_history.json`, `.venv`, `.git`, `__pycache__`, or `.pytest_cache`.
+- Include `.env.example` (placeholder credentials only).
+- Run `python -m pytest -q` after installing dependencies and verify Telegram/Discord test messages on the demo computer.

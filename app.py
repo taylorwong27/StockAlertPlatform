@@ -184,19 +184,33 @@ channel = st.selectbox(
 )
 
 if st.button("Set Price Alert"):
-    result = process_price_alert(
-        ticker,
-        current_price,
-        threshold,
-        direction,
-        channel,
-        signal=current_signal
-    )
-
-    if result["success"]:
-        st.success("Price alert sent successfully!")
-    else:
-        st.warning(result.get("error", "Unable to send alert."))
+    try:
+        result = process_price_alert(
+            ticker,
+            current_price,
+            threshold,
+            direction,
+            channel,
+            signal=current_signal,
+            latest_date=latest_date
+        )
+        if result.get("success"):
+            if result.get("history_saved") is False:
+                st.warning(result.get("error", "Notification sent, but history could not be saved."))
+            else:
+                st.success("Price alert sent successfully!")
+        else:
+            error = result.get("error", "Unable to send alert.")
+            if error == "Price condition not met":
+                st.info("Price condition not met; no alert was sent.")
+            elif error == "Duplicate alert already sent":
+                st.info("Duplicate alert skipped; no new notification was sent.")
+            else:
+                st.error(f"Alert not sent: {error}")
+    except (ValueError, OSError) as error:
+        st.error(f"Unable to access alert history: {error}")
+    except Exception:
+        st.error("Unable to process price alert. Please check the configuration.")
 
 # Independent TEST notification
 st.divider()
