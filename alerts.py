@@ -40,13 +40,12 @@ def send_telegram_message(message):
 
         return {
             "success": False,
-            "error": result.get("description", "Unknown error")
+            "error": "Telegram rejected the notification. Please check the bot configuration."
         }
-
-    except requests.RequestException as e:
+    except requests.RequestException:
         return {
             "success": False,
-            "error": str(e)
+            "error": "Network error while sending Telegram notification."
         }
 
 DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
@@ -80,13 +79,13 @@ def send_discord_message(message):
 
         return {
             "success": False,
-            "error": response.text
+            "error": "Discord rejected the notification. Please check the webhook configuration."
         }
 
-    except requests.RequestException as e:
+    except requests.RequestException:
         return {
             "success": False,
-            "error": str(e)
+            "error": "Network error while sending Discord notification."
         }
     
 def send_alert(message, channel):

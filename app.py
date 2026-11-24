@@ -1,6 +1,6 @@
 import streamlit as st
 
-from stock_data import get_price_history
+from stock_data import get_price_history, get_latest_price
 from stock_news import get_stock_news
 from signals import generate_signal, add_moving_averages
 from backtest import backtest_ma_cross
@@ -29,19 +29,46 @@ st.write("Selected Stock:", ticker)
 
 
 # Get Stock Data
+
+# Get Stock Data
 try:
+    # Retrieve historical data for charts and backtesting
     price_history = get_price_history(ticker, period="6mo")
 
     if price_history.empty:
-        st.error("No stock data available.")
+        st.error("No historical stock data available.")
         st.stop()
 
-    current_price = float(price_history["Close"].iloc[-1])
-    latest_date = price_history["Date"].iloc[-1]
+    # Validate the latest completed trading-day price
+    latest = get_latest_price(ticker)
 
-except Exception as error:
-    st.error(f"Unable to retrieve stock data: {error}")
+    current_price = float(latest["price"])
+    latest_date = latest["as_of"]
+
+    # Make sure the historical data and latest quote agree
+    history_latest_date = str(price_history["Date"].iloc[-1])
+
+    if history_latest_date != str(latest_date):
+        st.error(
+            "Latest stock price data is incomplete or inconsistent. "
+            "Please try again later."
+        )
+        st.stop()
+
+except (ValueError, RuntimeError):
+    st.error(
+        "Latest stock price is unavailable or incomplete. "
+        "Please try again later."
+    )
     st.stop()
+
+except Exception:
+    st.error(
+        "Unable to retrieve verified stock prices. "
+        "Please check your connection and try again."
+    )
+    st.stop()
+
 
 
 # Stock Price
@@ -206,7 +233,10 @@ if st.button("Set Price Alert"):
             elif error == "Duplicate alert already sent":
                 st.info("Duplicate alert skipped; no new notification was sent.")
             else:
-                st.error(f"Alert not sent: {error}")
+                st.error(
+                "Alert sending failed. "
+                "Please check your notification configuration and try again."
+                )
     except (ValueError, OSError) as error:
         st.error(f"Unable to access alert history: {error}")
     except Exception:
